@@ -1,5 +1,10 @@
 import { query } from '../config/db.js';
 
+export const findUserByEmail = async (email) => {
+  const res = await query('SELECT * FROM users WHERE email = $1', [email]);
+  return res.rows[0] || null;
+};
+
 export const findUserByPhone = async (phoneNumber) => {
   const res = await query('SELECT * FROM users WHERE phone_number = $1', [phoneNumber]);
   return res.rows[0] || null;
@@ -10,17 +15,17 @@ export const findUserById = async (id) => {
   return res.rows[0] || null;
 };
 
-export const createUser = async ({ phoneNumber, name = 'Safety User', gender = null, fcmToken = null }) => {
+export const createUser = async ({ email = null, phoneNumber = null, name = 'Safety User', gender = null, avatarUrl = null, fcmToken = null }) => {
   const res = await query(
-    `INSERT INTO users (phone_number, name, gender, fcm_token)
-     VALUES ($1, $2, $3, $4)
+    `INSERT INTO users (email, phone_number, name, gender, avatar_url, fcm_token)
+     VALUES ($1, $2, $3, $4, $5, $6)
      RETURNING *`,
-    [phoneNumber, name, gender, fcmToken]
+    [email, phoneNumber, name, gender, avatarUrl, fcmToken]
   );
   return res.rows[0];
 };
 
-export const updateUserProfile = async (id, { name, gender, avatarUrl, hasCompletedEmergencySetup, isSilentSosEnabled, fcmToken }) => {
+export const updateUserProfile = async (id, { name, gender, avatarUrl, hasCompletedEmergencySetup, isSilentSosEnabled, fcmToken, email }) => {
   const res = await query(
     `UPDATE users
      SET name = COALESCE($2, name),
@@ -28,10 +33,11 @@ export const updateUserProfile = async (id, { name, gender, avatarUrl, hasComple
          avatar_url = COALESCE($4, avatar_url),
          has_completed_emergency_setup = COALESCE($5, has_completed_emergency_setup),
          is_silent_sos_enabled = COALESCE($6, is_silent_sos_enabled),
-         fcm_token = COALESCE($7, fcm_token)
+         fcm_token = COALESCE($7, fcm_token),
+         email = COALESCE($8, email)
      WHERE id = $1
      RETURNING *`,
-    [id, name, gender, avatarUrl, hasCompletedEmergencySetup, isSilentSosEnabled, fcmToken]
+    [id, name, gender, avatarUrl, hasCompletedEmergencySetup, isSilentSosEnabled, fcmToken, email]
   );
   return res.rows[0];
 };

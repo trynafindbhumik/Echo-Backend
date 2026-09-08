@@ -1,9 +1,19 @@
 import { Router } from 'express';
 import { body } from 'express-validator';
-import { handleVerifyOtp } from '../controllers/auth.controller.js';
+import { handleGoogleLogin, handleVerifyOtp } from '../controllers/auth.controller.js';
 import { validateRequest } from '../middlewares/validate.middleware.js';
 
 const router = Router();
+
+router.post(
+  '/google',
+  [
+    body('idToken').optional(),
+    body('email').optional().isEmail(),
+  ],
+  validateRequest,
+  handleGoogleLogin
+);
 
 router.post(
   '/verify-otp',

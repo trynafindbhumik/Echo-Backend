@@ -11,6 +11,7 @@ export const handleGetProfile = async (req, res, next) => {
 
     return successResponse(res, 200, 'User profile fetched successfully.', {
       id: user.id,
+      email: user.email,
       phoneNumber: user.phone_number,
       name: user.name,
       gender: user.gender,
@@ -27,7 +28,7 @@ export const handleGetProfile = async (req, res, next) => {
 export const handleUpdateProfile = async (req, res, next) => {
   try {
     const userId = req.user.id;
-    const { name, gender, avatarUrl, hasCompletedEmergencySetup, isSilentSosEnabled, fcmToken } = req.body;
+    const { name, gender, avatarUrl, hasCompletedEmergencySetup, isSilentSosEnabled, fcmToken, email } = req.body;
 
     const updatedUser = await updateUserProfile(userId, {
       name,
@@ -36,10 +37,12 @@ export const handleUpdateProfile = async (req, res, next) => {
       hasCompletedEmergencySetup,
       isSilentSosEnabled,
       fcmToken,
+      email,
     });
 
     return successResponse(res, 200, 'Profile updated successfully.', {
       id: updatedUser.id,
+      email: updatedUser.email,
       phoneNumber: updatedUser.phone_number,
       name: updatedUser.name,
       gender: updatedUser.gender,

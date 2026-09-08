@@ -119,7 +119,8 @@ CREATE EXTENSION IF NOT EXISTS postgis;
 -- 1. Users Table
 CREATE TABLE users (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    phone_number VARCHAR(20) UNIQUE NOT NULL,
+    email VARCHAR(255) UNIQUE,
+    phone_number VARCHAR(20) UNIQUE,
     name VARCHAR(100) NOT NULL,
     gender VARCHAR(20),
     avatar_url TEXT,
