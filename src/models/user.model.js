@@ -25,7 +25,12 @@ export const createUser = async ({ email = null, phoneNumber = null, name = 'Saf
   return res.rows[0];
 };
 
-export const updateUserProfile = async (id, { name, gender, avatarUrl, hasCompletedEmergencySetup, isSilentSosEnabled, fcmToken, email }) => {
+export const updateUserProfile = async (id, { name, gender, avatarUrl, hasCompletedEmergencySetup, isSilentSosEnabled, fcmToken, email, phoneNumber }) => {
+  if (fcmToken) {
+    // Deduplicate FCM token across users (clear from other accounts on same device)
+    await query('UPDATE users SET fcm_token = NULL WHERE fcm_token = $1 AND id != $2', [fcmToken, id]);
+  }
+
   const res = await query(
     `UPDATE users
      SET name = COALESCE($2, name),
@@ -34,10 +39,24 @@ export const updateUserProfile = async (id, { name, gender, avatarUrl, hasComple
          has_completed_emergency_setup = COALESCE($5, has_completed_emergency_setup),
          is_silent_sos_enabled = COALESCE($6, is_silent_sos_enabled),
          fcm_token = COALESCE($7, fcm_token),
-         email = COALESCE($8, email)
+         email = COALESCE($8, email),
+         phone_number = COALESCE($9, phone_number)
      WHERE id = $1
      RETURNING *`,
-    [id, name, gender, avatarUrl, hasCompletedEmergencySetup, isSilentSosEnabled, fcmToken, email]
+    [id, name, gender, avatarUrl, hasCompletedEmergencySetup, isSilentSosEnabled, fcmToken, email, phoneNumber]
   );
   return res.rows[0];
 };
+
+export const clearStaleFcmToken = async (fcmToken) => {
+  if (!fcmToken) return;
+  await query('UPDATE users SET fcm_token = NULL WHERE fcm_token = $1', [fcmToken]);
+};
+
+export const updateUserFcmToken = async (id, fcmToken) => {
+  if (!fcmToken) return null;
+  await query('UPDATE users SET fcm_token = NULL WHERE fcm_token = $1 AND id != $2', [fcmToken, id]);
+  const res = await query('UPDATE users SET fcm_token = $1 WHERE id = $2 RETURNING *', [fcmToken, id]);
+  return res.rows[0];
+};
+

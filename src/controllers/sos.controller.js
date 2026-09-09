@@ -43,6 +43,7 @@ export const handleTriggerSos = async (req, res, next) => {
  */
 export const handleUploadAudioSnippet = async (req, res, next) => {
   try {
+    const userId = req.user.id;
     const { alertId } = req.params;
 
     if (!req.file) {
@@ -50,7 +51,10 @@ export const handleUploadAudioSnippet = async (req, res, next) => {
     }
 
     const audioUrl = await uploadAudioSnippet(req.file.path, alertId);
-    await updateSosAudioRecordUrl(alertId, audioUrl);
+    const updated = await updateSosAudioRecordUrl(alertId, userId, audioUrl);
+    if (!updated) {
+      return errorResponse(res, 404, 'Active SOS alert not found or unauthorized.');
+    }
 
     return successResponse(res, 200, 'Audio snippet uploaded successfully.', {
       audioRecordUrl: audioUrl,

@@ -54,6 +54,28 @@ export const sendEmergencyPushNotification = async ({ fcmTokens, title, body, da
   try {
     const response = await messaging.sendEachForMulticast(messagePayload);
     logger.info(`FCM multicast sent. Success: ${response.successCount}, Failures: ${response.failureCount}`);
+
+    if (response.failureCount > 0 && response.responses) {
+      response.responses.forEach((res, idx) => {
+        if (!res.success && res.error) {
+          const errorCode = res.error.code;
+          const failedToken = fcmTokens[idx];
+          if (
+            errorCode === 'messaging/registration-token-not-registered' ||
+            errorCode === 'messaging/invalid-registration-token' ||
+            errorCode === 'messaging/invalid-argument'
+          ) {
+            logger.warn(`Pruning stale FCM token from DB: ${failedToken} (Error: ${errorCode})`);
+            import('../models/user.model.js').then(({ clearStaleFcmToken }) => {
+              clearStaleFcmToken(failedToken).catch((err) =>
+                logger.error('Error clearing stale FCM token:', err)
+              );
+            });
+          }
+        }
+      });
+    }
+
     return response;
   } catch (err) {
     logger.error('Failed to send FCM multicast message:', err);

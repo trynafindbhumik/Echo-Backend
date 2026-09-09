@@ -31,13 +31,13 @@ export const findSosAlertById = async (alertId) => {
   return res.rows[0] || null;
 };
 
-export const updateSosAudioRecordUrl = async (alertId, audioRecordUrl) => {
+export const updateSosAudioRecordUrl = async (alertId, userId, audioRecordUrl) => {
   const res = await query(
     `UPDATE sos_alerts
-     SET audio_record_url = $2
-     WHERE id = $1
+     SET audio_record_url = $3
+     WHERE id = $1 AND user_id = $2
      RETURNING *`,
-    [alertId, audioRecordUrl]
+    [alertId, userId, audioRecordUrl]
   );
   return res.rows[0];
 };

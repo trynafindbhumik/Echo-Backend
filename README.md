@@ -171,6 +171,12 @@ CREATE TABLE tracking_sessions (
 );
 ```
 
+#### Existing Database Migration
+If updating from a prior database version, run the migration script:
+```bash
+psql -d echo_safety -f migrations/001_add_google_auth_support.sql
+```
+
 ---
 
 ## 🏃 Running the Server
@@ -197,6 +203,7 @@ Once the server is running, open your browser to access the interactive Swagger 
 ### 🔑 Authentication (`/api/v1/auth`)
 | Method | Endpoint | Description | Auth Required |
 | :--- | :--- | :--- | :---: |
+| `POST` | `/api/v1/auth/google` | Authenticate via Google Sign-In ID Token & issue JWT access tokens | ❌ |
 | `POST` | `/api/v1/auth/verify-otp` | Verify Firebase ID Token / OTP and issue JWT access tokens | ❌ |
 
 ### 👤 User Profile (`/api/v1/users`)

@@ -28,6 +28,33 @@ const swaggerOptions = {
         },
       },
       schemas: {
+        GoogleAuthRequest: {
+          type: 'object',
+          properties: {
+            idToken: {
+              type: 'string',
+              example: 'eyJhbGciOiJSUzI1NiIs...',
+              description: 'Google OAuth2 ID Token received from Google Sign-In SDK on mobile/web client',
+            },
+            fcmToken: {
+              type: 'string',
+              example: 'eX8K9f2m...',
+              description: 'Firebase Cloud Messaging token for push notifications',
+            },
+            email: {
+              type: 'string',
+              example: 'alex@example.com',
+            },
+            name: {
+              type: 'string',
+              example: 'Alex Johnson',
+            },
+            avatarUrl: {
+              type: 'string',
+              example: 'https://lh3.googleusercontent.com/a/default-avatar',
+            },
+          },
+        },
         VerifyOtpRequest: {
           type: 'object',
           properties: {
@@ -177,6 +204,25 @@ const swaggerOptions = {
       },
     },
     paths: {
+      '/auth/google': {
+        post: {
+          tags: ['Authentication'],
+          summary: 'Authenticate via Google Sign-In ID Token',
+          requestBody: {
+            required: true,
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/GoogleAuthRequest' },
+              },
+            },
+          },
+          responses: {
+            200: { description: 'Google authentication successful, returns JWT tokens and user profile' },
+            400: { description: 'Bad request or missing required parameters' },
+            401: { description: 'Invalid or expired Google ID Token' },
+          },
+        },
+      },
       '/auth/verify-otp': {
         post: {
           tags: ['Authentication'],
