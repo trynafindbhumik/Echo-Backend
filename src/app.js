@@ -18,7 +18,6 @@ app.use(cors({
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'x-api-key', 'encrypt', 'X-Requested-With', 'Accept', 'Origin'],
 }));
-app.options('*', cors());
 app.use(morgan('dev'));
 
 app.use(express.json({ limit: '10mb' }));
