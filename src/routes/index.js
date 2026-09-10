@@ -5,6 +5,7 @@ import contactRoutes from './contact.routes.js';
 import sosRoutes from './sos.routes.js';
 import alertRoutes from './alert.routes.js';
 import trackRoutes from './track.routes.js';
+import helplineRoutes from './helpline.routes.js';
 
 const router = Router();
 
@@ -14,5 +15,6 @@ router.use('/contacts', contactRoutes);
 router.use('/sos', sosRoutes);
 router.use('/alerts', alertRoutes);
 router.use('/track', trackRoutes);
+router.use('/helplines', helplineRoutes);
 
 export default router;

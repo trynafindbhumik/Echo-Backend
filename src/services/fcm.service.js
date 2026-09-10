@@ -27,14 +27,19 @@ export const sendEmergencyPushNotification = async ({ fcmTokens, title, body, da
     data: {
       ...data,
       click_action: 'FLUTTER_NOTIFICATION_CLICK',
-      sound: 'emergency_alarm.mp3',
+      sound: 'emergency_alarm',
+      priority: 'high',
     },
     android: {
       priority: 'high',
+      ttl: 3600 * 1000,
       notification: {
         sound: 'emergency_alarm',
         channelId: 'emergency_sos_channel',
         priority: 'max',
+        visibility: 'public',
+        defaultSound: true,
+        defaultVibrateTimings: true,
       },
     },
     apns: {
@@ -43,7 +48,11 @@ export const sendEmergencyPushNotification = async ({ fcmTokens, title, body, da
       },
       payload: {
         aps: {
-          sound: 'emergency_alarm.caf',
+          sound: {
+            critical: 1,
+            name: 'emergency_alarm.caf',
+            volume: 1.0,
+          },
           badge: 1,
         },
       },

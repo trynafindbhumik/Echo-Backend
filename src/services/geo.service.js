@@ -1,5 +1,6 @@
 import redisClient from '../config/redis.js';
 import logger from '../utils/logger.js';
+import { findUserFcmTokensByIds, findAllOtherUserFcmTokens } from '../models/user.model.js';
 
 /**
  * Updates a victim or bystander's location in the Redis spatial index.
@@ -38,4 +39,48 @@ export const queryNearbyInRedis = async (entityType, latitude, longitude, radius
     return [];
   }
 };
+
+/**
+ * Queries FCM tokens for nearby bystanders and users within a given geographic radius.
+ * If Redis spatial index has no tracked locations, falls back to all registered app users with FCM tokens.
+ * @param {object} params
+ * @param {number} params.latitude - Geographic latitude of origin
+ * @param {number} params.longitude - Geographic longitude of origin
+ * @param {number} [params.radiusKm=8] - Radius in km
+ * @param {string} [params.excludeUserId] - User ID to exclude (e.g. the victim)
+ * @returns {Promise<{ fcmTokens: Array<string>, nearbyCount: number }>}
+ */
+export const getNearbyUserFcmTokens = async ({ latitude, longitude, radiusKm = 8, excludeUserId }) => {
+  try {
+    const nearbyBystanders = await queryNearbyInRedis('bystander', latitude, longitude, radiusKm);
+    const nearbyVictims = await queryNearbyInRedis('victim', latitude, longitude, radiusKm);
+
+    const allNearby = [...nearbyBystanders, ...nearbyVictims];
+    const uniqueUserIds = [...new Set(allNearby.map(item => item.id))].filter(id => id !== excludeUserId);
+
+    let fcmTokens = [];
+    if (uniqueUserIds.length > 0) {
+      fcmTokens = await findUserFcmTokensByIds(uniqueUserIds);
+    }
+
+    // Fallback: If no live locations stored in Redis, dispatch to all registered app users with valid FCM tokens
+    if (fcmTokens.length === 0) {
+      logger.info(`No live bystander positions found in Redis within ${radiusKm}km. Falling back to all registered user FCM tokens.`);
+      fcmTokens = await findAllOtherUserFcmTokens(excludeUserId);
+      return { fcmTokens, nearbyCount: fcmTokens.length };
+    }
+
+    return { fcmTokens, nearbyCount: uniqueUserIds.length };
+  } catch (err) {
+    logger.error('Error fetching FCM tokens for nearby users:', err);
+    try {
+      const fallbackTokens = await findAllOtherUserFcmTokens(excludeUserId);
+      return { fcmTokens: fallbackTokens, nearbyCount: fallbackTokens.length };
+    } catch (fallbackErr) {
+      return { fcmTokens: [], nearbyCount: 0 };
+    }
+  }
+};
+
+
 

@@ -60,3 +60,22 @@ export const updateUserFcmToken = async (id, fcmToken) => {
   return res.rows[0];
 };
 
+export const findUserFcmTokensByIds = async (userIds) => {
+  if (!Array.isArray(userIds) || userIds.length === 0) return [];
+  const res = await query(
+    `SELECT DISTINCT fcm_token FROM users WHERE id = ANY($1::uuid[]) AND fcm_token IS NOT NULL AND fcm_token != ''`,
+    [userIds]
+  );
+  return res.rows.map(r => r.fcm_token);
+};
+
+export const findAllOtherUserFcmTokens = async (excludeUserId) => {
+  const res = await query(
+    `SELECT DISTINCT fcm_token FROM users WHERE fcm_token IS NOT NULL AND fcm_token != '' AND id != $1`,
+    [excludeUserId]
+  );
+  return res.rows.map(r => r.fcm_token);
+};
+
+
+

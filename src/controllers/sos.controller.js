@@ -1,12 +1,14 @@
 import { createSosAlert, updateSosAudioRecordUrl, resolveSosAlert, cancelFalseAlarmSosAlert } from '../models/sos.model.js';
 import { getContactsByUserId } from '../models/contact.model.js';
 import { sendEmergencyPushNotification } from '../services/fcm.service.js';
+import { updateLiveLocationInRedis, getNearbyUserFcmTokens } from '../services/geo.service.js';
 import { uploadAudioSnippet } from '../services/storage.service.js';
+import { getIO } from '../sockets/index.js';
 import { successResponse, errorResponse } from '../utils/apiResponse.js';
 import logger from '../utils/logger.js';
 
 /**
- * Triggers a high-priority emergency SOS alert and dispatches FCM notifications to emergency contacts.
+ * Triggers a high-priority emergency SOS alert and dispatches FCM notifications to emergency contacts and nearby bystanders.
  */
 export const handleTriggerSos = async (req, res, next) => {
   try {
@@ -14,22 +16,68 @@ export const handleTriggerSos = async (req, res, next) => {
     const { latitude, longitude, address, isSilent } = req.body;
 
     const sosAlert = await createSosAlert({ userId, latitude, longitude, address, isSilent });
-    const contacts = await getContactsByUserId(userId);
 
+    // Update victim's location in Redis spatial index
+    if (latitude != null && longitude != null) {
+      await updateLiveLocationInRedis(userId, 'victim', latitude, longitude);
+    }
+
+    // 1. Notify trusted emergency contacts via FCM
+    const contacts = await getContactsByUserId(userId);
     const contactFcmTokens = contacts.map(c => c.fcm_token).filter(Boolean);
+
+    const mapsUrl = (latitude != null && longitude != null) ? `https://maps.google.com/?q=${latitude},${longitude}` : '';
+    const trackUrl = `https://echo.app/track/${sosAlert.id}`;
+
     if (contactFcmTokens.length > 0) {
       await sendEmergencyPushNotification({
         fcmTokens: contactFcmTokens,
         title: '🚨 EMERGENCY SOS ALERT',
-        body: `EMERGENCY! Emergency contact has triggered an SOS alert at ${address || 'current location'}.`,
-        data: { alertId: sosAlert.id, latitude: String(latitude), longitude: String(longitude) },
+        body: `EMERGENCY! Emergency contact has triggered an SOS alert at ${address || 'current location'}. Live Map: ${mapsUrl || trackUrl}`,
+        data: {
+          alertId: sosAlert.id,
+          latitude: String(latitude || ''),
+          longitude: String(longitude || ''),
+          mapsUrl,
+          trackUrl,
+          type: 'EMERGENCY_CONTACT_SOS',
+        },
       });
+    }
+
+    // 2. Query & notify nearest bystanders/users via FCM within 8km radius
+    const { fcmTokens: nearbyFcmTokens, nearbyCount } = await getNearbyUserFcmTokens({
+      latitude: latitude || 0,
+      longitude: longitude || 0,
+      radiusKm: 8,
+      excludeUserId: userId,
+    });
+
+    const nearbyNotifiedCount = nearbyCount;
+
+    if (nearbyFcmTokens.length > 0) {
+      await sendEmergencyPushNotification({
+        fcmTokens: nearbyFcmTokens,
+        title: '🚨 NEARBY EMERGENCY SOS ALERT',
+        body: `EMERGENCY! Someone nearby triggered an SOS alert at ${address || 'a location near you'}. Live Map: ${mapsUrl || trackUrl}`,
+        data: {
+          alertId: sosAlert.id,
+          latitude: String(latitude || ''),
+          longitude: String(longitude || ''),
+          address: address || '',
+          mapsUrl,
+          trackUrl,
+          type: 'NEARBY_SOS',
+        },
+      });
+      logger.info(`Dispatched nearby FCM alert for SOS ${sosAlert.id} to ${nearbyFcmTokens.length} device(s).`);
     }
 
     return successResponse(res, 201, 'SOS Alert triggered successfully.', {
       alertId: sosAlert.id,
       status: sosAlert.status,
-      contactsNotifiedCount: contacts.length,
+      contactsNotifiedCount: contactFcmTokens.length,
+      nearbyRespondersNotifiedCount: nearbyNotifiedCount,
       policeNotified: true,
       timestamp: sosAlert.created_at,
     });
@@ -54,6 +102,15 @@ export const handleUploadAudioSnippet = async (req, res, next) => {
     const updated = await updateSosAudioRecordUrl(alertId, userId, audioUrl);
     if (!updated) {
       return errorResponse(res, 404, 'Active SOS alert not found or unauthorized.');
+    }
+
+    const io = getIO();
+    if (io) {
+      io.to(`alert:${alertId}`).emit('sos:audio_uploaded', {
+        alertId,
+        audioRecordUrl: audioUrl,
+        timestamp: new Date().toISOString(),
+      });
     }
 
     return successResponse(res, 200, 'Audio snippet uploaded successfully.', {
