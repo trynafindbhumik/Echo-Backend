@@ -4,6 +4,7 @@ import http from 'http';
 import app from './src/app.js';
 import { initializeSocketIO } from './src/sockets/index.js';
 import logger from './src/utils/logger.js';
+import { runMigrations } from './src/utils/migrator.js';
 
 const PORT = process.env.PORT || 5000;
 
@@ -13,14 +14,26 @@ initializeSocketIO(server);
 const baseUrl = process.env.RENDER_EXTERNAL_URL || process.env.APP_URL || `http://localhost:${PORT}`;
 const wsUrl = baseUrl.replace(/^http/, 'ws');
 
-server.listen(PORT, () => {
-  logger.info(`==================================================`);
-  logger.info(`🚨 Echo Safety Backend Server running on port ${PORT}`);
-  logger.info(`📡 HTTP Endpoint: ${baseUrl}/api/v1`);
-  logger.info(`📚 Swagger UI Docs: ${baseUrl}/docs`);
-  logger.info(`⚡ WebSocket Endpoint: ${wsUrl}`);
-  logger.info(`==================================================`);
-});
+const startServer = async () => {
+  try {
+    // Automatically run pending database migrations on startup
+    await runMigrations();
+
+    server.listen(PORT, () => {
+      logger.info(`==================================================`);
+      logger.info(`🚨 Echo Safety Backend Server running on port ${PORT}`);
+      logger.info(`📡 HTTP Endpoint: ${baseUrl}/api/v1`);
+      logger.info(`📚 Swagger UI Docs: ${baseUrl}/docs`);
+      logger.info(`⚡ WebSocket Endpoint: ${wsUrl}`);
+      logger.info(`==================================================`);
+    });
+  } catch (err) {
+    logger.error('💥 Server startup aborted due to migration failure:', err);
+    process.exit(1);
+  }
+};
+
+startServer();
 
 process.on('unhandledRejection', (reason) => {
   logger.error('Unhandled Promise Rejection:', reason);
@@ -29,4 +42,5 @@ process.on('unhandledRejection', (reason) => {
 process.on('uncaughtException', (err) => {
   logger.error('Uncaught Exception thrown:', err);
 });
+
 
