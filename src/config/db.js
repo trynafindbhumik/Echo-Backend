@@ -2,7 +2,7 @@ import dns from 'dns';
 import pg from 'pg';
 import logger from '../utils/logger.js';
 
-// Prefer IPv4 over IPv6 to prevent ENETUNREACH network errors on Render
+// Force IPv4 DNS resolution first to prevent ENETUNREACH errors on cloud hostings like Render
 if (dns.setDefaultResultOrder) {
   dns.setDefaultResultOrder('ipv4first');
 }
