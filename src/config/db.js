@@ -1,20 +1,5 @@
-import dns from 'dns';
 import pg from 'pg';
 import logger from '../utils/logger.js';
-
-// Global DNS result order preference for IPv4
-if (dns.setDefaultResultOrder) {
-  dns.setDefaultResultOrder('ipv4first');
-}
-
-// Custom lookup function forcing IPv4 family resolution for pg driver
-const ipv4Lookup = (hostname, options, callback) => {
-  if (typeof options === 'function') {
-    callback = options;
-    options = {};
-  }
-  return dns.lookup(hostname, { ...options, family: 4 }, callback);
-};
 
 const { Pool } = pg;
 
@@ -29,8 +14,6 @@ const pool = new Pool({
   max: 20,
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 10000,
-  family: 4,
-  lookup: ipv4Lookup,
   ssl: isCloudEnv && process.env.DB_SSL !== 'false' ? { rejectUnauthorized: false } : false,
 });
 
@@ -49,6 +32,7 @@ pool.on('error', (err) => {
  */
 export const query = (text, params) => pool.query(text, params);
 export default pool;
+
 
 
 
