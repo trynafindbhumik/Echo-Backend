@@ -7,6 +7,28 @@ import logger from '../utils/logger.js';
  * @param {import('socket.io').Socket} socket - Connected client socket instance
  */
 export const registerSosSocketHandlers = (io, socket) => {
+  socket.on('join:nearby_incidents', async (payload) => {
+    try {
+      socket.join('nearby_incidents');
+      logger.info(`Socket ${socket.id} joined room: nearby_incidents`);
+
+      if (payload && payload.latitude != null && payload.longitude != null && socket.user?.id) {
+        await updateLiveLocationInRedis(socket.user.id, 'bystander', payload.latitude, payload.longitude);
+      }
+    } catch (err) {
+      logger.error('Error handling join:nearby_incidents socket event:', err);
+    }
+  });
+
+  socket.on('leave:nearby_incidents', () => {
+    try {
+      socket.leave('nearby_incidents');
+      logger.info(`Socket ${socket.id} left room: nearby_incidents`);
+    } catch (err) {
+      logger.error('Error handling leave:nearby_incidents socket event:', err);
+    }
+  });
+
   socket.on('sos:location_update', async (payload) => {
     try {
       const { alertId, latitude, longitude, accuracy, speed, heading } = payload;
