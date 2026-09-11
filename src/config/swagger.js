@@ -13,6 +13,9 @@ const swaggerOptions = {
       },
     },
     servers: [
+      ...(process.env.RENDER_EXTERNAL_URL || process.env.APP_URL
+        ? [{ url: `${process.env.RENDER_EXTERNAL_URL || process.env.APP_URL}/api/v1`, description: 'Production Server' }]
+        : []),
       {
         url: 'http://localhost:5000/api/v1',
         description: 'Development Server',

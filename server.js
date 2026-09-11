@@ -10,12 +10,15 @@ const PORT = process.env.PORT || 5000;
 const server = http.createServer(app);
 initializeSocketIO(server);
 
+const baseUrl = process.env.RENDER_EXTERNAL_URL || process.env.APP_URL || `http://localhost:${PORT}`;
+const wsUrl = baseUrl.replace(/^http/, 'ws');
+
 server.listen(PORT, () => {
   logger.info(`==================================================`);
   logger.info(`🚨 Echo Safety Backend Server running on port ${PORT}`);
-  logger.info(`📡 HTTP Endpoint: http://localhost:${PORT}/api/v1`);
-  logger.info(`📚 Swagger UI Docs: http://localhost:${PORT}/docs`);
-  logger.info(`⚡ WebSocket Endpoint: ws://localhost:${PORT}`);
+  logger.info(`📡 HTTP Endpoint: ${baseUrl}/api/v1`);
+  logger.info(`📚 Swagger UI Docs: ${baseUrl}/docs`);
+  logger.info(`⚡ WebSocket Endpoint: ${wsUrl}`);
   logger.info(`==================================================`);
 });
 
