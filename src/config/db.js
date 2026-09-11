@@ -3,11 +3,18 @@ import logger from '../utils/logger.js';
 
 const { Pool } = pg;
 
+const connectionString =
+  process.env.DATABASE_URL ||
+  `postgres://${process.env.DB_USER || 'postgres'}:${process.env.DB_PASSWORD || 'postgres'}@${process.env.DB_HOST || 'localhost'}:${process.env.DB_PORT || 5432}/${process.env.DB_NAME || 'echo_safety'}`;
+
+const isCloudEnv = Boolean(process.env.DATABASE_URL || process.env.RENDER || process.env.NODE_ENV === 'production');
+
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL || `postgres://${process.env.DB_USER || 'postgres'}:${process.env.DB_PASSWORD || 'postgres'}@${process.env.DB_HOST || 'localhost'}:${process.env.DB_PORT || 5432}/${process.env.DB_NAME || 'echo_safety'}`,
+  connectionString,
   max: 20,
   idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 2000,
+  connectionTimeoutMillis: 10000,
+  ssl: isCloudEnv && process.env.DB_SSL !== 'false' ? { rejectUnauthorized: false } : false,
 });
 
 pool.on('connect', () => {
@@ -25,4 +32,7 @@ pool.on('error', (err) => {
  */
 export const query = (text, params) => pool.query(text, params);
 export default pool;
+
+
+
 
