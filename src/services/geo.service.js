@@ -3,7 +3,7 @@ import logger from '../utils/logger.js';
 import { findUserFcmTokensByIds, findAllOtherUserFcmTokens } from '../models/user.model.js';
 
 /**
- * Updates a victim or bystander's location in the Redis spatial index.
+ * Updates a victim or bystander's location in the Redis spatial index with a 15-minute TTL.
  * @param {string} entityId - User identifier
  * @param {string} entityType - Entity type ('victim' | 'bystander')
  * @param {number} latitude - Geographic latitude
@@ -13,6 +13,9 @@ export const updateLiveLocationInRedis = async (entityId, entityType, latitude, 
   try {
     const key = `geo:${entityType}s`;
     await redisClient.geoadd(key, longitude, latitude, entityId);
+    // Store companion location freshness timestamp with 15-minute expiration (900 seconds)
+    const timestampKey = `geo:last_seen:${entityId}`;
+    await redisClient.set(timestampKey, Date.now().toString(), 'EX', 900);
   } catch (err) {
     logger.error(`Error storing live location in Redis for ${entityType}:${entityId}:`, err);
   }
@@ -20,6 +23,7 @@ export const updateLiveLocationInRedis = async (entityId, entityType, latitude, 
 
 /**
  * Queries nearby responders or incidents within a given radius using Redis spatial indexing.
+ * Filters out stale locations whose last_seen timestamp key has expired (>15 mins).
  * @param {string} entityType - Entity type ('victim' | 'bystander')
  * @param {number} latitude - Target latitude
  * @param {number} longitude - Target longitude
@@ -30,10 +34,20 @@ export const queryNearbyInRedis = async (entityType, latitude, longitude, radius
   try {
     const key = `geo:${entityType}s`;
     const results = await redisClient.georadius(key, longitude, latitude, radiusKm, 'km', 'WITHDIST', 'ASC');
-    return results.map(([id, distance]) => ({
-      id,
-      distanceKm: parseFloat(distance),
-    }));
+    
+    // Verify location freshness for each candidate
+    const freshResults = [];
+    for (const [id, distance] of results) {
+      const timestampKey = `geo:last_seen:${id}`;
+      const lastSeen = await redisClient.get(timestampKey);
+      if (lastSeen) {
+        freshResults.push({
+          id,
+          distanceKm: parseFloat(distance),
+        });
+      }
+    }
+    return freshResults;
   } catch (err) {
     logger.error(`Error querying nearby ${entityType}s in Redis:`, err);
     return [];
@@ -42,7 +56,7 @@ export const queryNearbyInRedis = async (entityType, latitude, longitude, radius
 
 /**
  * Queries FCM tokens for nearby bystanders and users within a given geographic radius.
- * If Redis spatial index has no tracked locations, falls back to all registered app users with FCM tokens.
+ * Only notifies users with fresh location updates within the last 15 minutes.
  * @param {object} params
  * @param {number} params.latitude - Geographic latitude of origin
  * @param {number} params.longitude - Geographic longitude of origin
@@ -63,22 +77,10 @@ export const getNearbyUserFcmTokens = async ({ latitude, longitude, radiusKm = 8
       fcmTokens = await findUserFcmTokensByIds(uniqueUserIds);
     }
 
-    // Fallback: If no live locations stored in Redis, dispatch to all registered app users with valid FCM tokens
-    if (fcmTokens.length === 0) {
-      logger.info(`No live bystander positions found in Redis within ${radiusKm}km. Falling back to all registered user FCM tokens.`);
-      fcmTokens = await findAllOtherUserFcmTokens(excludeUserId);
-      return { fcmTokens, nearbyCount: fcmTokens.length };
-    }
-
     return { fcmTokens, nearbyCount: uniqueUserIds.length };
   } catch (err) {
     logger.error('Error fetching FCM tokens for nearby users:', err);
-    try {
-      const fallbackTokens = await findAllOtherUserFcmTokens(excludeUserId);
-      return { fcmTokens: fallbackTokens, nearbyCount: fallbackTokens.length };
-    } catch (fallbackErr) {
-      return { fcmTokens: [], nearbyCount: 0 };
-    }
+    return { fcmTokens: [], nearbyCount: 0 };
   }
 };
 

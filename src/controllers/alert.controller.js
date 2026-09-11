@@ -1,5 +1,6 @@
 import { findNearbyActiveAlerts } from '../models/sos.model.js';
 import { successResponse, errorResponse } from '../utils/apiResponse.js';
+import { getIO } from '../sockets/index.js';
 
 export const handleGetNearbyAlerts = async (req, res, next) => {
   try {
@@ -21,6 +22,11 @@ export const handleGetNearbyAlerts = async (req, res, next) => {
 export const handleRespondAlert = async (req, res, next) => {
   try {
     const { alertId } = req.params;
+    const io = getIO();
+    if (io) {
+      io.to('nearby_incidents').emit('sos:responder_updated', { alertId, status: 'en_route' });
+      io.to(`alert:${alertId}`).emit('sos:responder_updated', { alertId, status: 'en_route' });
+    }
     return successResponse(res, 200, 'Responder en route acknowledged.', { alertId, status: 'en_route' });
   } catch (err) {
     next(err);

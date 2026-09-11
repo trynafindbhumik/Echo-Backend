@@ -73,6 +73,21 @@ export const handleTriggerSos = async (req, res, next) => {
       logger.info(`Dispatched nearby FCM alert for SOS ${sosAlert.id} to ${nearbyFcmTokens.length} device(s).`);
     }
 
+    // Broadcast real-time socket event to all clients on Nearby Incidents tab
+    const io = getIO();
+    if (io) {
+      io.to('nearby_incidents').emit('sos:created', {
+        id: sosAlert.id,
+        user_id: userId,
+        latitude: latitude || 0,
+        longitude: longitude || 0,
+        address: address || 'Nearby Location',
+        status: sosAlert.status,
+        created_at: sosAlert.created_at,
+        nearby_responders_count: nearbyNotifiedCount,
+      });
+    }
+
     return successResponse(res, 201, 'SOS Alert triggered successfully.', {
       alertId: sosAlert.id,
       status: sosAlert.status,
